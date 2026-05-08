@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.schemas.kyc import KYCCreate, OTPRequest, OTPVerify, KYCResponse
 from app.models.kyc import CustomerKYC, OTPStore
-from app.utils.minio_client import upload_id_proof
+from app.utils.cloudinary_client import upload_id_proof
 import random, string
 
 router = APIRouter(prefix="/api/kyc", tags=["KYC"])
