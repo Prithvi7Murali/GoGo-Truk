@@ -1,9 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.database import Base, engine
 from app.routers import kyc
-
-Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="GoGoTruk API",
