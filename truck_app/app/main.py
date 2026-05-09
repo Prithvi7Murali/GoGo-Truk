@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import kyc
+from app.routers import company_kyc
 
 app = FastAPI(
     title="GoGoTruk API",
@@ -17,6 +18,7 @@ app.add_middleware(
 )
 
 app.include_router(kyc.router)
+app.include_router(company_kyc.router)
 
 @app.get("/")
 def root():

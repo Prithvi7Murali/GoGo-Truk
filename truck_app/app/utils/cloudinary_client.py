@@ -16,12 +16,15 @@ cloudinary.config(
     secure=True
 )
 
-def upload_id_proof(file_data: bytes, filename: str, content_type: str) -> str:
-    unique_id = str(uuid.uuid4())
+def upload_document(file_data: bytes, folder: str) -> str:
     result = cloudinary.uploader.upload(
         file_data,
-        folder="gogotruk/kyc",
-        public_id=unique_id,
+        folder=folder,
+        public_id=str(uuid.uuid4()),
         resource_type="auto"
     )
     return result["secure_url"]
+
+
+def upload_id_proof(file_data: bytes, filename: str, content_type: str) -> str:
+    return upload_document(file_data, "gogotruk/kyc")
