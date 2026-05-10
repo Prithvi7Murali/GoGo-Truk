@@ -3,7 +3,8 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.schemas.kyc import KYCCreate, OTPRequest, OTPVerify, KYCResponse
 from app.models.kyc import CustomerKYC, OTPStore
-from app.utils.minio_client import upload_id_proof
+from app.utils.cloudinary_client import upload_id_proof
+from app.config import settings
 import random, string
 
 router = APIRouter(prefix="/api/kyc", tags=["KYC"])
@@ -16,14 +17,19 @@ def send_otp(request: OTPRequest, db: Session = Depends(get_db)):
     # Delete any old OTPs for this mobile
     db.query(OTPStore).filter(OTPStore.mobile == request.mobile).delete()
 
-    # Save new OTP to database
     otp_record = OTPStore(mobile=request.mobile, otp=otp)
+
+    if settings.DEV_MODE:
+        # Auto-verify in dev — no real SMS sent, phone numbers flow straight through
+        otp_record.is_verified = "true"
+
     db.add(otp_record)
     db.commit()
 
-    # In production: send via MSG91 SMS gateway
-    print(f">>> OTP for {request.mobile}: {otp}")
-    return {"message": "OTP sent successfully", "dev_otp": otp}
+    response = {"message": "OTP sent successfully"}
+    if settings.DEV_MODE:
+        response["dev_otp"] = otp  # expose OTP in response for dev/testing only
+    return response
 
 @router.post("/verify-otp")
 def verify_otp(request: OTPVerify, db: Session = Depends(get_db)):
