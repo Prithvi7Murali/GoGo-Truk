@@ -46,7 +46,7 @@ class CompanyKYCCreate(BaseModel):
     contact_person_name:   str
     contact_person_mobile: str
     contact_person_email:  EmailStr
-    customer_kyc_id:       Optional[int] = None
+    customer_kyc_id: int
 
     @field_validator("company_type")
     @classmethod
@@ -89,8 +89,44 @@ class CompanyKYCResponse(BaseModel):
     contact_person_email:  str
     incorporation_cert_url: Optional[str] = None
     gst_certificate_url:   Optional[str] = None
-    status:                str
-    customer_kyc_id:       Optional[int] = None
+    status:          str
+    customer_kyc_id: int
+
+    class Config:
+        from_attributes = True
+
+
+class OwnerKYCCreate(BaseModel):
+    first_name:    str
+    middle_name:   Optional[str] = None
+    last_name:     str
+    date_of_birth: date
+    mobile:        str
+    email:         EmailStr
+    company_name:  Optional[str] = None
+    address_1:     str
+    address_2:     Optional[str] = None
+    address_3:     Optional[str] = None
+
+    @field_validator("mobile")
+    @classmethod
+    def validate_mobile(cls, v):
+        if not re.match(r"^[6-9]\d{9}$", v):
+            raise ValueError("Enter a valid 10-digit Indian mobile number")
+        return v
+
+
+class OwnerKYCResponse(BaseModel):
+    id:                  int
+    first_name:          str
+    last_name:           str
+    mobile:              str
+    email:               str
+    company_name:        Optional[str] = None
+    driving_license_url: Optional[str] = None
+    owner_id_url:        Optional[str] = None
+    status:              str
+    otp_verified:        str
 
     class Config:
         from_attributes = True

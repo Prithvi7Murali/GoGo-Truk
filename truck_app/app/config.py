@@ -9,6 +9,10 @@ class Settings(BaseSettings):
     SUPABASE_URL: str
     SUPABASE_KEY: str
     DEV_MODE: bool = True  # set False in production to enforce real OTP delivery
+    SENDGRID_API_KEY: str = ""
+    SENDGRID_FROM_EMAIL: str = ""
+    MSG91_API_KEY: str = ""
+    MSG91_SENDER_ID: str = "GOTRUK"
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

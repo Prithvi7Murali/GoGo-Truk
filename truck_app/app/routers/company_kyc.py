@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.schemas.kyc import CompanyKYCCreate, CompanyKYCResponse
-from app.models.kyc import CompanyKYC
-from app.utils.cloudinary_client import upload_document
+from app.models.kyc import CompanyKYC, CustomerKYC
+from app.utils.cloudinary_client import upload_document, upload_pdf_doc
 
 router = APIRouter(prefix="/api/company-kyc", tags=["Company KYC"])
 
@@ -12,6 +12,12 @@ ALLOWED_TYPES = ["image/jpeg", "image/png", "application/pdf"]
 
 @router.post("/register", response_model=CompanyKYCResponse)
 def register_company_kyc(data: CompanyKYCCreate, db: Session = Depends(get_db)):
+    individual = db.query(CustomerKYC).filter(CustomerKYC.id == data.customer_kyc_id).first()
+    if not individual:
+        raise HTTPException(status_code=404, detail="Individual KYC record not found")
+    if individual.customer_type != "Company":
+        raise HTTPException(status_code=400, detail="Individual KYC must have customer_type 'Company' to register a company")
+
     existing = db.query(CompanyKYC).filter(CompanyKYC.gst_number == data.gst_number).first()
     if existing:
         raise HTTPException(status_code=400, detail="GST number already registered")
@@ -40,14 +46,16 @@ def upload_company_docs(
     if incorporation_cert:
         if incorporation_cert.content_type not in ALLOWED_TYPES:
             raise HTTPException(status_code=400, detail="incorporation_cert: only JPG, PNG or PDF allowed")
-        company.incorporation_cert_url = upload_document(
+        upload_fn = upload_pdf_doc if incorporation_cert.content_type == "application/pdf" else upload_document
+        company.incorporation_cert_url = upload_fn(
             incorporation_cert.file.read(), "gogotruk/company-kyc/incorporation"
         )
 
     if gst_certificate:
         if gst_certificate.content_type not in ALLOWED_TYPES:
             raise HTTPException(status_code=400, detail="gst_certificate: only JPG, PNG or PDF allowed")
-        company.gst_certificate_url = upload_document(
+        upload_fn = upload_pdf_doc if gst_certificate.content_type == "application/pdf" else upload_document
+        company.gst_certificate_url = upload_fn(
             gst_certificate.file.read(), "gogotruk/company-kyc/gst"
         )
 
