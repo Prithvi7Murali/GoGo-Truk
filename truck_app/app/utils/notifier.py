@@ -21,6 +21,34 @@ def notify_kyc_status_change(name: str, mobile: str, email: str, kyc_type: str, 
     _send_email(email, name, status, kyc_type, message)
 
 
+def notify_document_expiry(owner, vehicle, doc_name: str, days_left: int):
+    if days_left < 0:
+        subject = f"EXPIRED: {doc_name} for vehicle {vehicle.registration_number}"
+        message = (
+            f"Dear {owner.first_name}, your {doc_name} for vehicle "
+            f"{vehicle.registration_number} has expired. "
+            f"The vehicle has been marked inactive until documents are renewed."
+        )
+    else:
+        subject = f"Expiry Alert: {doc_name} expires in {days_left} days"
+        message = (
+            f"Dear {owner.first_name}, your {doc_name} for vehicle "
+            f"{vehicle.registration_number} expires in {days_left} days. "
+            f"Please renew it to avoid service disruption."
+        )
+
+    if settings.DEV_MODE:
+        print(f"\n[NOTIFICATION] {subject}")
+        print(f"  Owner:   {owner.first_name} {owner.last_name}")
+        print(f"  Mobile:  {owner.mobile}")
+        print(f"  Email:   {owner.email}")
+        print(f"  Message: {message}\n")
+        return
+
+    _send_sms(owner.mobile, message)
+    _send_email(owner.email, owner.first_name, subject, "", message)
+
+
 def _send_sms(mobile: str, message: str):
     # Production: integrate MSG91 here
     # import requests

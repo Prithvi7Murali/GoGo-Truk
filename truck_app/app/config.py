@@ -6,8 +6,8 @@ class Settings(BaseSettings):
     CLOUDINARY_API_KEY: str
     CLOUDINARY_API_SECRET: str
     SECRET_KEY: str
-    SUPABASE_URL: str
-    SUPABASE_KEY: str
+    SUPABASE_URL: str = ""
+    SUPABASE_KEY: str = ""
     DEV_MODE: bool = True  # set False in production to enforce real OTP delivery
     SENDGRID_API_KEY: str = ""
     SENDGRID_FROM_EMAIL: str = ""
