@@ -48,13 +48,17 @@ def upload_fleet_docs(
     rc_expiry_date: Optional[date] = Form(None),
     insurance: UploadFile = File(None),
     insurance_expiry_date: Optional[date] = Form(None),
+    permit: UploadFile = File(None),
+    permit_expiry_date: Optional[date] = Form(None),
+    puc: UploadFile = File(None),
+    puc_expiry_date: Optional[date] = Form(None),
     db: Session = Depends(get_db),
 ):
     vehicle = db.query(Fleet).filter(Fleet.id == fleet_id).first()
     if not vehicle:
         raise HTTPException(status_code=404, detail="Fleet record not found")
 
-    if not rc_book and not insurance:
+    if not any([rc_book, insurance, permit, puc]):
         raise HTTPException(status_code=400, detail="At least one document must be provided")
 
     if rc_book:
@@ -72,6 +76,22 @@ def upload_fleet_docs(
         vehicle.insurance_url = upload_fn(insurance.file.read(), "gogotruk/fleet/insurance")
         if insurance_expiry_date:
             vehicle.insurance_expiry_date = insurance_expiry_date
+
+    if permit:
+        if permit.content_type not in ALLOWED_TYPES:
+            raise HTTPException(status_code=400, detail="permit: only JPG, PNG or PDF allowed")
+        upload_fn = upload_pdf_doc if permit.content_type == "application/pdf" else upload_document
+        vehicle.permit_url = upload_fn(permit.file.read(), "gogotruk/fleet/permit")
+        if permit_expiry_date:
+            vehicle.permit_expiry_date = permit_expiry_date
+
+    if puc:
+        if puc.content_type not in ALLOWED_TYPES:
+            raise HTTPException(status_code=400, detail="puc: only JPG, PNG or PDF allowed")
+        upload_fn = upload_pdf_doc if puc.content_type == "application/pdf" else upload_document
+        vehicle.puc_url = upload_fn(puc.file.read(), "gogotruk/fleet/puc")
+        if puc_expiry_date:
+            vehicle.puc_expiry_date = puc_expiry_date
 
     db.commit()
     db.refresh(vehicle)

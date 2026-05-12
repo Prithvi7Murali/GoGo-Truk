@@ -12,7 +12,9 @@ class KYCCreate(BaseModel):
     email:         EmailStr
     address_1:     str
     address_2:     Optional[str] = None
-    address_3:     Optional[str] = None
+    city:          Optional[str] = None
+    state:         Optional[str] = None
+    zip_code:      Optional[str] = None
     customer_type: str
 
     @field_validator("mobile")
@@ -72,8 +74,9 @@ class CompanyKYCCreate(BaseModel):
     @field_validator("contact_person_mobile")
     @classmethod
     def validate_mobile(cls, v):
-        if not re.match(r"^[6-9]\d{9}$", v):
-            raise ValueError("Enter a valid 10-digit Indian mobile number")
+        # mobile: 10 digits starting 6-9  |  landline: 11 digits starting with 0
+        if not re.match(r"^([6-9]\d{9}|0[1-9]\d{9})$", v):
+            raise ValueError("Enter a valid Indian mobile (10 digits) or landline number (e.g. 01140001234)")
         return v
 
 
@@ -106,7 +109,9 @@ class OwnerKYCCreate(BaseModel):
     company_name:  Optional[str] = None
     address_1:     str
     address_2:     Optional[str] = None
-    address_3:     Optional[str] = None
+    city:          Optional[str] = None
+    state:         Optional[str] = None
+    zip_code:      Optional[str] = None
 
     @field_validator("mobile")
     @classmethod
@@ -123,6 +128,11 @@ class OwnerKYCResponse(BaseModel):
     mobile:              str
     email:               str
     company_name:        Optional[str] = None
+    address_1:           str
+    address_2:           Optional[str] = None
+    city:                Optional[str] = None
+    state:               Optional[str] = None
+    zip_code:            Optional[str] = None
     driving_license_url: Optional[str] = None
     owner_id_url:        Optional[str] = None
     status:              str
@@ -140,13 +150,19 @@ class OTPVerify(BaseModel):
     otp:    str
 
 class KYCResponse(BaseModel):
-    id:           int
-    first_name:   str
-    last_name:    str
-    mobile:       str
-    email:        str
-    status:       str
-    otp_verified: str
+    id:            int
+    first_name:    str
+    last_name:     str
+    mobile:        str
+    email:         str
+    address_1:     str
+    address_2:     Optional[str] = None
+    city:          Optional[str] = None
+    state:         Optional[str] = None
+    zip_code:      Optional[str] = None
+    customer_type: str
+    status:        str
+    otp_verified:  str
 
     class Config:
         from_attributes = True
