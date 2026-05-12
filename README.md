@@ -125,6 +125,10 @@ truck_app/
 | POST | `/api/kyc/upload-id/{id}` | Upload ID proof (JPG/PNG/PDF) |
 | GET  | `/api/kyc/status/{id}` | Get KYC status |
 
+**Register request fields:** `first_name`, `middle_name` (opt), `last_name`, `date_of_birth`, `mobile`, `email`, `address_1`, `address_2` (opt), `city` (opt), `state` (opt), `zip_code` (opt), `customer_type` (`"Individual"` or `"Company"`)
+
+**Status response fields:** `id`, `first_name`, `last_name`, `mobile`, `email`, `address_1`, `address_2`, `city`, `state`, `zip_code`, `customer_type`, `status`, `otp_verified`
+
 ### Company KYC — Story 2
 > Requires an Individual KYC with `customer_type = "Company"` first.
 
@@ -134,12 +138,20 @@ truck_app/
 | POST | `/api/company-kyc/upload-docs/{id}` | Upload incorporation cert + GST certificate |
 | GET  | `/api/company-kyc/status/{id}` | Get status |
 
+**`contact_person_mobile`** accepts both:
+- Mobile: 10 digits starting with 6–9 (e.g. `9876543210`)
+- Landline: 11 digits starting with `0` (e.g. `01140001234`)
+
 ### Owner KYC — Story 3
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/api/owner-kyc/register` | Register truck owner |
 | POST | `/api/owner-kyc/upload-docs/{id}` | Upload driving license + owner ID |
 | GET  | `/api/owner-kyc/status/{id}` | Get status |
+
+**Register request fields:** `first_name`, `middle_name` (opt), `last_name`, `date_of_birth`, `mobile`, `email`, `company_name` (opt), `address_1`, `address_2` (opt), `city` (opt), `state` (opt), `zip_code` (opt)
+
+**Status response fields:** `id`, `first_name`, `last_name`, `mobile`, `email`, `company_name`, `address_1`, `address_2`, `city`, `state`, `zip_code`, `driving_license_url`, `owner_id_url`, `status`, `otp_verified`
 
 ### Digital Consent — Story 4
 | Method | Endpoint | Description |
@@ -196,7 +208,8 @@ truck_app/
 ## Validation Rules
 | Field | Rule |
 |-------|------|
-| Mobile | 10-digit Indian number starting with 6-9 |
+| Mobile (individual / owner) | 10-digit Indian number starting with 6–9 |
+| Contact person number (company) | 10-digit mobile (6–9 start) **or** 11-digit landline starting with `0` |
 | GST Number | 15-character Indian GST format |
 | Pincode | 6-digit Indian pincode |
 | Registration Number | Indian format e.g. `MH12AB1234` |
