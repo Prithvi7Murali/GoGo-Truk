@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     SENDGRID_FROM_EMAIL: str = ""
     MSG91_API_KEY: str = ""
     MSG91_SENDER_ID: str = "GOTRUK"
+    REDIS_URL: str = ""
+    FCM_SERVER_KEY: str = ""
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

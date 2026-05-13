@@ -13,6 +13,13 @@ from app.routers import docs_proxy
 from app.routers import fleet
 from app.routers.vehicle_type import admin_router as vehicle_type_admin_router
 from app.routers.vehicle_type import public_router as vehicle_type_public_router
+from app.routers import availability
+from app.routers import search
+from app.routers import booking
+from app.routers.rate_card import admin_router as rate_card_admin_router
+from app.routers.rate_card import public_router as rate_card_public_router
+from app.routers import invoice
+from app.routers import cancellation
 from app.utils.scheduler import start_scheduler, stop_scheduler
 
 
@@ -52,6 +59,13 @@ app.include_router(docs_proxy.router)
 app.include_router(fleet.router)
 app.include_router(vehicle_type_admin_router)
 app.include_router(vehicle_type_public_router)
+app.include_router(availability.router)
+app.include_router(search.router)
+app.include_router(booking.router)
+app.include_router(rate_card_admin_router)
+app.include_router(rate_card_public_router)
+app.include_router(invoice.router)
+app.include_router(cancellation.router)
 
 @app.get("/")
 def root():
