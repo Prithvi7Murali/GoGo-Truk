@@ -35,12 +35,26 @@ def _run_auto_reject():
         db.close()
 
 
+def _run_weekly_report():
+    from app.tasks.report_tasks import run_weekly_report
+    run_weekly_report()
+
+
+def _run_monthly_report():
+    from app.tasks.report_tasks import run_monthly_report
+    run_monthly_report()
+
+
 def start_scheduler():
-    _scheduler.add_job(_run_expiry_check, "cron", hour=8, minute=0, id="expiry_check", replace_existing=True)
-    _scheduler.add_job(_run_auto_reject, "interval", minutes=10, id="auto_reject", replace_existing=True)
+    _scheduler.add_job(_run_expiry_check,  "cron",     hour=8, minute=0, id="expiry_check",   replace_existing=True)
+    _scheduler.add_job(_run_auto_reject,   "interval", minutes=10,        id="auto_reject",    replace_existing=True)
+    _scheduler.add_job(_run_weekly_report, "cron",     day_of_week="mon", hour=8, minute=0, id="weekly_report",  replace_existing=True)
+    _scheduler.add_job(_run_monthly_report,"cron",     day=1,             hour=8, minute=0, id="monthly_report", replace_existing=True)
     _scheduler.start()
-    print("[scheduler] Expiry check job scheduled — runs daily at 08:00")
-    print("[scheduler] Auto-reject job scheduled — runs every 10 minutes")
+    print("[scheduler] Expiry check    — daily at 08:00")
+    print("[scheduler] Auto-reject     — every 10 minutes")
+    print("[scheduler] Weekly report   — every Monday at 08:00")
+    print("[scheduler] Monthly report  — 1st of every month at 08:00")
 
 
 def stop_scheduler():

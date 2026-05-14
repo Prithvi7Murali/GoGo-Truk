@@ -19,7 +19,7 @@
 
 ### 1 — Install Dependencies
 ```bash
-pip install fastapi uvicorn sqlalchemy psycopg2-binary pydantic pydantic-settings "pydantic[email]" python-multipart cloudinary alembic reportlab apscheduler celery redis
+pip install fastapi uvicorn sqlalchemy psycopg2-binary pydantic pydantic-settings "pydantic[email]" python-multipart cloudinary alembic reportlab apscheduler celery redis PyJWT "passlib[bcrypt]" openpyxl
 ```
 
 ### 2 — Set Up `.env`
@@ -27,7 +27,7 @@ pip install fastapi uvicorn sqlalchemy psycopg2-binary pydantic pydantic-setting
 # from truck_app/
 copy .env.example .env
 ```
-All values in `.env.example` are pre-filled for the shared dev DB.
+All values in `.env.example` are pre-filled for the **shared dev DB** — use this if a teammate gave you access. If you need your own isolated Supabase DB, follow the section below first.
 
 ### 3 — Run
 ```bash
@@ -39,6 +39,78 @@ Migrations run automatically on every startup. No manual `alembic` commands need
 ### 4 — Verify
 - API root: http://127.0.0.1:8000/
 - Swagger docs: http://127.0.0.1:8000/docs
+
+On first startup, the server automatically seeds vehicle types and rate cards. You'll see `[seed]` lines in the terminal confirming this.
+
+---
+
+## Setting Up Your Own Supabase Database
+
+Follow this if you want a personal isolated database (e.g. for a feature branch or to avoid polluting shared dev data).
+
+### Step 1 — Create a Supabase Account and Project
+1. Go to [supabase.com](https://supabase.com) and sign up / log in
+2. Click **New project**
+3. Fill in:
+   - **Name:** `gogotruk-dev` (or any name)
+   - **Database Password:** choose a strong password and save it — you'll need it
+   - **Region:** pick the closest to you
+4. Click **Create new project** and wait ~1 minute for provisioning
+
+### Step 2 — Get Your DATABASE_URL
+1. In your project, go to **Settings → Database**
+2. Scroll down to **Connection string**
+3. Select the **URI** tab
+4. Copy the connection string — it looks like:
+   ```
+   postgresql://postgres:[YOUR-PASSWORD]@db.<project-ref>.supabase.co:5432/postgres
+   ```
+5. Replace `[YOUR-PASSWORD]` with the password you set in Step 1
+6. Paste this as `DATABASE_URL` in your `.env`
+
+> **Note:** Use port `5432` (direct connection), not `6543` (PgBouncer/pooler). SQLAlchemy + Alembic need a direct connection.
+
+### Step 3 — Get Your SUPABASE_URL and SUPABASE_KEY
+1. In your project, go to **Settings → API**
+2. Copy **Project URL** → paste as `SUPABASE_URL` in `.env`
+3. Copy **anon public** key → paste as `SUPABASE_KEY` in `.env`
+
+### Step 4 — Update Your `.env`
+Your `.env` should now look like this for the DB section:
+```env
+DATABASE_URL=postgresql://postgres:yourpassword@db.abcxyz.supabase.co:5432/postgres
+SUPABASE_URL=https://abcxyz.supabase.co
+SUPABASE_KEY=eyJhbGci...your-anon-key
+```
+All other values (`CLOUDINARY_*`, `SECRET_KEY`, etc.) can stay as-is from `.env.example`.
+
+### Step 5 — Run and Let Alembic Build Your Schema
+```bash
+uvicorn app.main:app --reload
+```
+On first run, Alembic detects an empty database and creates all tables automatically. You'll see migration logs in the terminal. No SQL scripts to run manually.
+
+### Step 6 — First Startup Auto-Seeds Everything
+```bash
+uvicorn app.main:app --reload
+```
+On first run against a fresh DB, the server automatically seeds vehicle types and rate cards. Watch the terminal for `[seed]` lines confirming this.
+
+**For the superadmin account** — either:
+- Set env vars before starting: `SEED_ADMIN_USERNAME`, `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD` → auto-created on startup
+- Or call `POST /api/admin/auth/setup` once the server is running
+
+If neither is done, the server prints a warning on startup reminding you to create a superadmin.
+
+### Connecting via Supabase SQL Editor (Optional)
+You can also inspect or query your DB directly from the Supabase dashboard:
+1. Go to your project → **SQL Editor**
+2. Run any SQL you need, e.g.:
+   ```sql
+   SELECT * FROM "CUSTOMER_KYC";
+   SELECT * FROM "BOOKING";
+   ```
+Table names are uppercase (e.g. `"ADMIN_USER"`, `"FLEET"`, `"BOOKING"`) — always quote them in SQL.
 
 ---
 
@@ -85,6 +157,8 @@ Both jobs start automatically with the server:
 |-----|----------|--------|
 | Expiry check | Daily at 08:00 | Alerts at 30 and 7 days before expiry, marks vehicle inactive if expired |
 | Auto-reject | Every 10 minutes | Rejects bookings with no owner response within 2 hours |
+| Weekly report | Every Monday at 08:00 | Generates and emails weekly business report to `MANAGEMENT_EMAIL` |
+| Monthly report | 1st of every month at 08:00 | Generates and emails monthly business report to `MANAGEMENT_EMAIL` |
 
 ### Celery (Optional)
 If `REDIS_URL` is set, Celery is used for async notification delivery. Without it, FastAPI BackgroundTasks handles notifications — no setup needed for dev.
@@ -116,7 +190,8 @@ truck_app/
 │   │   ├── booking.py       # Booking
 │   │   ├── rate_card.py     # RateCard
 │   │   ├── invoice.py       # Invoice
-│   │   └── cancellation.py  # CancellationLog
+│   │   ├── cancellation.py  # CancellationLog
+│   │   └── admin_user.py    # AdminUser
 │   ├── schemas/             # Pydantic request/response models
 │   ├── routers/             # One file per feature
 │   ├── tasks/
@@ -129,11 +204,13 @@ truck_app/
 │       ├── invoice_pdf.py        # GST invoice PDF (ReportLab)
 │       ├── pricing.py            # Pricing engine + GST calculator
 │       ├── cache.py              # Redis cache + distributed lock
+│       ├── auth.py               # JWT + bcrypt helpers + FastAPI dependencies
 │       └── scheduler.py          # APScheduler setup
 ├── alembic/
 │   ├── env.py               # Imports all models for autogenerate
 │   └── versions/            # Migration files (commit these)
 ├── _migrate.py              # Called by lifespan — auto-generate + upgrade
+├── seed.py                  # One-time setup: vehicle types, rate cards, superadmin
 ├── .env                     # Local secrets (gitignored)
 ├── .env.example             # Template with shared dev credentials
 └── start.ps1                # Alternative: runs migrations then uvicorn
@@ -304,10 +381,68 @@ Invoice number format: `INV-YYYYMMDD-000001`
 
 On cancel: slot released to Available, search cache invalidated, both parties notified via SMS.
 
+### Reporting & Analytics — Story 17
+> All endpoints require `Authorization: Bearer <token>`.
+
+#### Live Dashboard
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/admin/analytics/summary` | Key metrics — bookings, revenue, active trucks, new customers |
+| GET | `/api/admin/analytics/top-routes` | Top routes by booking count |
+| GET | `/api/admin/analytics/trend` | Daily bookings + revenue trend |
+| GET | `/api/admin/analytics/customer-growth` | Monthly new customer counts (last N months) |
+
+**Shared query params:** `?period=last_7_days\|last_30_days\|weekly\|monthly\|custom` + `date_from` / `date_to` for custom range.
+
+#### Report Generation
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/admin/analytics/generate-report` | Generate + email report now (`?report_type=weekly\|monthly`) |
+| GET  | `/api/admin/analytics/download/report.pdf` | Download report PDF directly |
+| GET  | `/api/admin/analytics/download/report.xlsx` | Download report Excel directly |
+
+#### Scheduled (automatic)
+| Schedule | Report | Delivery |
+|----------|--------|----------|
+| Every Monday 08:00 | Weekly report | PDF + Excel emailed to `MANAGEMENT_EMAIL` |
+| 1st of month 08:00 | Monthly report | PDF + Excel emailed to `MANAGEMENT_EMAIL` |
+
+**Report contents:** Bookings summary, revenue breakdown (invoiced/collected/outstanding), active trucks, new customers, top 10 routes, daily trend, customer growth (monthly report only).
+
+In `DEV_MODE`, reports are generated but only logged to the console — no email sent.
+
 ### Document Proxy
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/docs/view?url=<cloudinary_url>` | Proxy any document or invoice PDF via signed URL |
+
+### Admin Auth — Story 16
+> All `/api/admin/*` endpoints require a valid JWT (`Authorization: Bearer <token>`).
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/admin/auth/setup` | Bootstrap first superadmin (blocked once any admin exists) |
+| POST | `/api/admin/auth/login` | Login — returns JWT token |
+| GET  | `/api/admin/auth/me` | Get current admin profile |
+| POST | `/api/admin/auth/admins` | Superadmin creates a new admin account |
+| GET  | `/api/admin/auth/admins` | List all admins (superadmin only) |
+| DELETE | `/api/admin/auth/admins/{id}` | Deactivate an admin account (superadmin only) |
+
+**Roles:** `admin` (standard access) and `superadmin` (can manage other admins). Token expires after `JWT_EXPIRE_MINUTES` (default 480 = 8 hours).
+
+### Admin Dashboard — Story 16
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/admin/dashboard/metrics` | Summary counts — KYC, bookings, revenue, fleet |
+| GET | `/api/admin/dashboard/kyc-queue` | KYC queue with filters: `?status=Pending&customer_type=Individual` |
+| GET | `/api/admin/dashboard/fleet-queue` | Fleet list with `?is_active=true/false` |
+| GET | `/api/admin/dashboard/bookings` | Booking overview with `?status=&date_from=&date_to=` |
+| GET | `/api/admin/dashboard/revenue` | Revenue report with `?status=&date_from=&date_to=` |
+| GET | `/api/admin/dashboard/users/kyc/{id}` | Individual KYC detail |
+| GET | `/api/admin/dashboard/export/bookings.xlsx` | Download bookings Excel |
+| GET | `/api/admin/dashboard/export/revenue.xlsx` | Download revenue Excel |
+
+All dashboard endpoints support `page` and `page_size` query params (default: page=1, page_size=20, max=100).
 
 ---
 
@@ -326,6 +461,7 @@ On cancel: slot released to Available, search cache invalidated, both parties no
 | `CANCELLATION_LOG` | 15 | Cancellation + refund records |
 | `RATE_CARD` | 14 | Pricing slabs per vehicle type |
 | `INVOICE` | 14 | GST invoices |
+| `ADMIN_USER` | 16 | Admin panel accounts with role (admin / superadmin) |
 
 ---
 
@@ -359,5 +495,7 @@ On cancel: slot released to Available, search cache invalidated, both parties no
 | `SENDGRID_FROM_EMAIL` | No | Required when `DEV_MODE=false` |
 | `REDIS_URL` | No | Enables Redis caching + Celery async tasks |
 | `FCM_SERVER_KEY` | No | Firebase push notifications to owners |
+| `JWT_EXPIRE_MINUTES` | No | Admin token lifetime in minutes (default `480` = 8 hours) |
+| `MANAGEMENT_EMAIL` | No | Comma-separated emails for weekly/monthly report delivery |
 | `SUPABASE_URL` | No | Not used in current endpoints |
 | `SUPABASE_KEY` | No | Not used in current endpoints |

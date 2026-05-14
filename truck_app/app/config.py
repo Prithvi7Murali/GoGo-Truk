@@ -15,6 +15,11 @@ class Settings(BaseSettings):
     MSG91_SENDER_ID: str = "GOTRUK"
     REDIS_URL: str = ""
     FCM_SERVER_KEY: str = ""
+    JWT_EXPIRE_MINUTES: int = 480   # 8 hours
+    SEED_ADMIN_USERNAME: str = ""
+    SEED_ADMIN_EMAIL: str = ""
+    SEED_ADMIN_PASSWORD: str = ""
+    MANAGEMENT_EMAIL: str = ""   # comma-separated list for report delivery
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

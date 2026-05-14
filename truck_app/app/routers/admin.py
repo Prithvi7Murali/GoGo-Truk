@@ -4,6 +4,7 @@ from app.database import get_db
 from app.schemas.admin import KYCReviewAction, PendingKYCItem
 from app.models.kyc import CustomerKYC, CompanyKYC, OwnerKYC, KYCStatus
 from app.utils.notifier import notify_kyc_status_change
+from app.utils.auth import get_current_admin
 from typing import List
 
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
@@ -12,7 +13,7 @@ router = APIRouter(prefix="/api/admin", tags=["Admin"])
 # ── Pending queue ─────────────────────────────────────────────────────────────
 
 @router.get("/kyc/pending", response_model=List[PendingKYCItem])
-def get_pending_kyc(db: Session = Depends(get_db)):
+def get_pending_kyc(db: Session = Depends(get_db), _=Depends(get_current_admin)):
     results = []
 
     for customer in db.query(CustomerKYC).filter(CustomerKYC.status == KYCStatus.PENDING).all():
@@ -55,7 +56,7 @@ def get_pending_kyc(db: Session = Depends(get_db)):
 # ── Detail views ──────────────────────────────────────────────────────────────
 
 @router.get("/kyc/customer/{kyc_id}")
-def get_customer_kyc_detail(kyc_id: int, db: Session = Depends(get_db)):
+def get_customer_kyc_detail(kyc_id: int, db: Session = Depends(get_db), _=Depends(get_current_admin)):
     record = db.query(CustomerKYC).filter(CustomerKYC.id == kyc_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Customer KYC not found")
@@ -63,7 +64,7 @@ def get_customer_kyc_detail(kyc_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/kyc/company/{kyc_id}")
-def get_company_kyc_detail(kyc_id: int, db: Session = Depends(get_db)):
+def get_company_kyc_detail(kyc_id: int, db: Session = Depends(get_db), _=Depends(get_current_admin)):
     record = db.query(CompanyKYC).filter(CompanyKYC.id == kyc_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Company KYC not found")
@@ -71,7 +72,7 @@ def get_company_kyc_detail(kyc_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/kyc/owner/{kyc_id}")
-def get_owner_kyc_detail(kyc_id: int, db: Session = Depends(get_db)):
+def get_owner_kyc_detail(kyc_id: int, db: Session = Depends(get_db), _=Depends(get_current_admin)):
     record = db.query(OwnerKYC).filter(OwnerKYC.id == kyc_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Owner KYC not found")
@@ -81,7 +82,7 @@ def get_owner_kyc_detail(kyc_id: int, db: Session = Depends(get_db)):
 # ── Review actions ────────────────────────────────────────────────────────────
 
 @router.post("/kyc/customer/{kyc_id}/review")
-def review_customer_kyc(kyc_id: int, action: KYCReviewAction, db: Session = Depends(get_db)):
+def review_customer_kyc(kyc_id: int, action: KYCReviewAction, db: Session = Depends(get_db), _=Depends(get_current_admin)):
     action.validate_action()
     record = db.query(CustomerKYC).filter(CustomerKYC.id == kyc_id).first()
     if not record:
@@ -104,7 +105,7 @@ def review_customer_kyc(kyc_id: int, action: KYCReviewAction, db: Session = Depe
 
 
 @router.post("/kyc/company/{kyc_id}/review")
-def review_company_kyc(kyc_id: int, action: KYCReviewAction, db: Session = Depends(get_db)):
+def review_company_kyc(kyc_id: int, action: KYCReviewAction, db: Session = Depends(get_db), _=Depends(get_current_admin)):
     action.validate_action()
     record = db.query(CompanyKYC).filter(CompanyKYC.id == kyc_id).first()
     if not record:
@@ -127,7 +128,7 @@ def review_company_kyc(kyc_id: int, action: KYCReviewAction, db: Session = Depen
 
 
 @router.post("/kyc/owner/{kyc_id}/review")
-def review_owner_kyc(kyc_id: int, action: KYCReviewAction, db: Session = Depends(get_db)):
+def review_owner_kyc(kyc_id: int, action: KYCReviewAction, db: Session = Depends(get_db), _=Depends(get_current_admin)):
     action.validate_action()
     record = db.query(OwnerKYC).filter(OwnerKYC.id == kyc_id).first()
     if not record:

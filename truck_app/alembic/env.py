@@ -20,6 +20,8 @@ import app.models.booking        # noqa: F401
 import app.models.rate_card      # noqa: F401
 import app.models.invoice        # noqa: F401
 import app.models.cancellation   # noqa: F401
+import app.models.admin_user        # noqa: F401
+import app.models.notification_log  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
