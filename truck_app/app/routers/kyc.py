@@ -9,27 +9,28 @@ import random, string
 
 router = APIRouter(prefix="/api/kyc", tags=["KYC"])
 
+from app.utils.otp_sender import generate_otp, send_otp as dispatch_otp
+
 @router.post("/send-otp")
 def send_otp(request: OTPRequest, db: Session = Depends(get_db)):
-    """Step 1 — Generate and store OTP in database"""
-    otp = "".join(random.choices(string.digits, k=6))
+    """Step 1 — Generate OTP and send via DEV or PROD mode"""
+    otp = generate_otp()
 
     # Delete any old OTPs for this mobile
     db.query(OTPStore).filter(OTPStore.mobile == request.mobile).delete()
 
+    # Save new OTP to database
     otp_record = OTPStore(mobile=request.mobile, otp=otp)
-
-    if settings.DEV_MODE:
-        # Auto-verify in dev — no real SMS sent, phone numbers flow straight through
-        otp_record.is_verified = "true"
-
     db.add(otp_record)
     db.commit()
 
-    response = {"message": "OTP sent successfully"}
-    if settings.DEV_MODE:
-        response["dev_otp"] = otp  # expose OTP in response for dev/testing only
-    return response
+    # Send OTP via DEV or PROD mode
+    result = dispatch_otp(
+        mobile=request.mobile,
+        email=getattr(request, "email", ""),
+        otp=otp
+    )
+    return result
 
 @router.post("/verify-otp")
 def verify_otp(request: OTPVerify, db: Session = Depends(get_db)):
