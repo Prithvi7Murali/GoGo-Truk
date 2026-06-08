@@ -212,25 +212,119 @@ def notify_booking_created(owner, booking):
     _log("booking_created", "push", f"New Booking Request — {booking.booking_date}", mobile=owner.mobile)
 
 
-def _send_fcm_push(owner, title: str, body: str):
-    # Production: send via FCM HTTP API using FCM_SERVER_KEY from settings
-    # Requires the owner's FCM device token (stored when they log in on mobile)
-    # import requests
-    # requests.post("https://fcm.googleapis.com/fcm/send", ...)
-    pass
-
-
 def _send_sms(mobile: str, message: str):
-    # Production: integrate MSG91 here
-    # import requests
-    # requests.post("https://api.msg91.com/api/v5/flow/", ...)
-    pass
+    """Production: send SMS via MSG91"""
+    if not settings.MSG91_API_KEY:
+        print(f"[NOTIFIER] MSG91_API_KEY not set — SMS skipped for {mobile}")
+        return
+    try:
+        import requests
+        url = "https://api.msg91.com/api/v5/flow/"
+        payload = {
+            "template_id": settings.MSG91_TEMPLATE_ID,
+            "short_url":   "0",
+            "recipients":  [{"mobiles": f"91{mobile}", "message": message}],
+        }
+        headers = {
+            "authkey":      settings.MSG91_API_KEY,
+            "content-type": "application/json",
+        }
+        response = requests.post(url, json=payload, headers=headers, timeout=10)
+        if response.status_code == 200:
+            print(f"[NOTIFIER] SMS sent to {mobile}")
+        else:
+            print(f"[NOTIFIER] SMS failed for {mobile}: {response.text}")
+        _log("sms_sent", "sms", message, mobile=mobile, status="delivered"
+             if response.status_code == 200 else "failed",
+             error=response.text if response.status_code != 200 else None)
+    except Exception as e:
+        print(f"[NOTIFIER] SMS error for {mobile}: {e}")
+        _log("sms_error", "sms", message, mobile=mobile, status="failed", error=str(e))
 
 
-def _send_email(email: str, name: str, status: str, kyc_type: str, message: str):
-    # Production: integrate SendGrid here
-    # from sendgrid import SendGridAPIClient
-    # from sendgrid.helpers.mail import Mail
-    # sg = SendGridAPIClient(settings.SENDGRID_API_KEY)
-    # sg.send(Mail(...))
-    pass
+def _send_email(email: str, name: str, subject: str, kyc_type: str, message: str):
+    """Production: send email via SendGrid"""
+    if not settings.SENDGRID_API_KEY or not settings.SENDGRID_FROM_EMAIL:
+        print(f"[NOTIFIER] SendGrid not configured — email skipped for {email}")
+        return
+    try:
+        from sendgrid import SendGridAPIClient
+        from sendgrid.helpers.mail import Mail
+
+        html_content = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto;">
+            <div style="background: #E87820; padding: 20px; border-radius: 8px 8px 0 0;">
+                <h1 style="color: white; margin: 0; font-size: 24px;">GoGoTruk</h1>
+                <p style="color: #fff; margin: 4px 0 0;">Logistics Platform</p>
+            </div>
+            <div style="background: #f9f9f9; padding: 24px; border-radius: 0 0 8px 8px;">
+                <p style="font-size: 16px; color: #333;">Dear {name},</p>
+                <p style="font-size: 15px; color: #555; line-height: 1.6;">{message}</p>
+                <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;"/>
+                <p style="font-size: 12px; color: #999;">
+                    This is an automated message from GoGoTruk.<br/>
+                    Please do not reply to this email.
+                </p>
+            </div>
+        </div>
+        """
+
+        mail = Mail(
+            from_email=settings.SENDGRID_FROM_EMAIL,
+            to_emails=email,
+            subject=subject,
+            html_content=html_content
+        )
+
+        sg = SendGridAPIClient(settings.SENDGRID_API_KEY)
+        response = sg.send(mail)
+
+        if response.status_code in [200, 202]:
+            print(f"[NOTIFIER] Email sent to {email} — {subject}")
+        else:
+            print(f"[NOTIFIER] Email failed for {email}: {response.status_code}")
+
+        _log("email_sent", "email", message, email=email,
+             subject=subject,
+             status="delivered" if response.status_code in [200, 202] else "failed")
+
+    except Exception as e:
+        print(f"[NOTIFIER] Email error for {email}: {e}")
+        _log("email_error", "email", message, email=email,
+             subject=subject, status="failed", error=str(e))
+
+
+def _send_fcm_push(owner, title: str, body: str):
+    """Production: send push notification via Firebase FCM"""
+    if not settings.FCM_SERVER_KEY:
+        print(f"[NOTIFIER] FCM_SERVER_KEY not set — push skipped for {owner.mobile}")
+        return
+    try:
+        import requests
+        headers = {
+            "Authorization": f"key={settings.FCM_SERVER_KEY}",
+            "Content-Type":  "application/json",
+        }
+        payload = {
+            "to":           f"/topics/owner_{owner.id}",
+            "notification": {"title": title, "body": body},
+            "data":         {"owner_id": str(owner.id)},
+        }
+        response = requests.post(
+            "https://fcm.googleapis.com/fcm/send",
+            json=payload,
+            headers=headers,
+            timeout=10
+        )
+        if response.status_code == 200:
+            print(f"[NOTIFIER] Push sent to owner {owner.id} — {title}")
+        else:
+            print(f"[NOTIFIER] Push failed for owner {owner.id}: {response.text}")
+        _log("push_sent", "push", body, mobile=owner.mobile,
+             subject=title,
+             status="delivered" if response.status_code == 200 else "failed",
+             error=response.text if response.status_code != 200 else None)
+    except Exception as e:
+        print(f"[NOTIFIER] Push error for owner {owner.id}: {e}")
+        _log("push_error", "push", body, mobile=owner.mobile,
+             subject=title, status="failed", error=str(e))
