@@ -1,13 +1,49 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.schemas.kyc import OwnerKYCCreate, OwnerKYCResponse
+from app.schemas.kyc import OwnerKYCCreate, OwnerKYCResponse, OTPRequest, OTPVerify
 from app.models.kyc import OwnerKYC, OTPStore
 from app.utils.cloudinary_client import upload_document, upload_pdf_doc
+from app.utils.otp_sender import generate_otp, send_otp as dispatch_otp
 
 router = APIRouter(prefix="/api/owner-kyc", tags=["Owner KYC"])
 
 ALLOWED_TYPES = ["image/jpeg", "image/png", "application/pdf"]
+
+
+@router.post("/send-otp")
+def send_owner_otp(request: OTPRequest, db: Session = Depends(get_db)):
+    """Step 1 — Send OTP to truck owner mobile"""
+    otp = generate_otp()
+
+    db.query(OTPStore).filter(OTPStore.mobile == request.mobile).delete()
+
+    otp_record = OTPStore(mobile=request.mobile, otp=otp)
+    db.add(otp_record)
+    db.commit()
+
+    result = dispatch_otp(
+        mobile=request.mobile,
+        email=getattr(request, "email", ""),
+        otp=otp
+    )
+    return result
+
+
+@router.post("/verify-otp")
+def verify_owner_otp(request: OTPVerify, db: Session = Depends(get_db)):
+    """Step 2 — Verify OTP entered by truck owner"""
+    otp_record = db.query(OTPStore).filter(
+        OTPStore.mobile == request.mobile,
+        OTPStore.otp == request.otp
+    ).first()
+
+    if not otp_record:
+        raise HTTPException(status_code=400, detail="Invalid or expired OTP")
+
+    otp_record.is_verified = "true"
+    db.commit()
+    return {"message": "OTP verified successfully"}
 
 
 @router.post("/register", response_model=OwnerKYCResponse)

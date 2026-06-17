@@ -144,6 +144,7 @@ class OwnerKYCResponse(BaseModel):
 
 class OTPRequest(BaseModel):
     mobile: str
+    email: Optional[str] = None 
 
 class OTPVerify(BaseModel):
     mobile: str
